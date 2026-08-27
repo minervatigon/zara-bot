@@ -1,0 +1,53 @@
+name: Zara stock
+
+on:
+  schedule:
+    # Cada 15 minutos. GitHub suele retrasar los cron unos minutos en horas punta.
+    - cron: "*/15 * * * *"
+  workflow_dispatch:  # permite lanzarlo a mano desde la pestaña Actions
+
+# Necesario para poder guardar estado_productos.json de vuelta en el repo
+permissions:
+  contents: write
+
+concurrency:
+  group: zara-stock
+  cancel-in-progress: false
+
+jobs:
+  revisar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Instalar dependencias
+        run: pip install -r requirements.txt
+
+      - name: Revisar stock
+        env:
+          ZARA_EMAIL: ${{ secrets.ZARA_EMAIL }}
+          ZARA_EMAIL_PASSWORD: ${{ secrets.ZARA_EMAIL_PASSWORD }}
+          ZARA_EMAIL_DESTINO: ${{ secrets.ZARA_EMAIL_DESTINO }}
+          ZARA_HEADLESS: "1"
+        run: python -u main.py --once
+
+      - name: Guardar el estado para la próxima ejecución
+        run: |
+          if git diff --quiet -- estado_productos.json; then
+            echo "Sin cambios de estado"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add estado_productos.json
+          git commit -m "Actualizar estado de stock [skip ci]"
+          # Otra ejecución puede haber hecho commit mientras tanto
+          git pull --rebase --autostash origin "${GITHUB_REF_NAME}"
+          git push origin "HEAD:${GITHUB_REF_NAME}"

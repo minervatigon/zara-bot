@@ -1,0 +1,7 @@
+venv/
+__pycache__/
+*.pyc
+.env
+main.py.bak
+zara_debug.html
+zara_debug.png
