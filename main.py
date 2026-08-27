@@ -157,6 +157,13 @@ ESTADOS_DISPONIBLES = {
 }
 
 
+# Tallas cuyo estado no se ha podido leer en la última revisión.
+# Si Zara bloquea al bot o cambia el formato de sus datos, el resultado sería
+# "no disponible" para todo y el run acabaría en verde sin que te enteres:
+# esta lista permite distinguir "agotado" de "no he podido mirarlo".
+TALLAS_NO_LEIDAS = []
+
+
 def _talla_disponible(availability):
     """Traduce el campo availability de Zara a disponible/no disponible."""
     valor = str(availability).strip().lower()
@@ -285,11 +292,13 @@ def verificar_disponibilidad_talla(driver, talla):
                         print(f"      ❌ Talla {talla}: AGOTADA ({availability})")
                     return False
 
-        print(f"   ❌ Talla {talla} no encontrada en los datos JSON de la página")
+        print(f"   ⚠️ Talla {talla} NO encontrada en los datos JSON de la página")
+        TALLAS_NO_LEIDAS.append(talla)
         return False
 
     except Exception as e:
         print(f"⚠️ Error verificando talla {talla}: {e}")
+        TALLAS_NO_LEIDAS.append(talla)
         return False
 
 
@@ -365,6 +374,7 @@ def buscar_stock():
     
     # Cargar productos
     productos = cargar_productos()
+    TALLAS_NO_LEIDAS.clear()
     
     if not productos:
         print("❌ No hay productos para monitorear")
@@ -506,4 +516,11 @@ if __name__ == "__main__":
         monitoreo_continuo()
     else:
         buscar_stock()
+        if TALLAS_NO_LEIDAS:
+            print("\n" + "=" * 60)
+            print(f"⚠️ No se pudo leer el estado de: {', '.join(TALLAS_NO_LEIDAS)}")
+            print("   Zara puede haber bloqueado la petición o cambiado su formato.")
+            print("   El bot NO puede garantizar que te avise: revisa el log.")
+            print("=" * 60)
+            sys.exit(1)  # marca el run en rojo para que GitHub te avise por correo
         print("\n✅ Revisión completada.")
